@@ -47,8 +47,8 @@ export default function MainLayout({ userRole, session }: { userRole: UserRole, 
         to={to}
         onClick={() => isMobile && setSidebarOpen(false)}
         className={({ isActive }) => `w-full flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-300 group relative overflow-hidden mb-1 ${isActive
-            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
-            : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+          ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/25'
+          : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
           }`}
       >
         <div className="relative z-10 flex items-center gap-3 font-medium">
@@ -68,17 +68,23 @@ export default function MainLayout({ userRole, session }: { userRole: UserRole, 
       >
         <div className="p-6 pb-2">
           <div className="flex items-center gap-3 mb-6 px-2">
-            <div className="relative w-10 h-10 group cursor-pointer">
-              <div className="absolute inset-0 bg-blue-500 blur-lg opacity-40 rounded-full"></div>
-              <div className="relative w-full h-full rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white border border-white/10 shadow-inner">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 16H9m10 4h3v-7.25c0-1.16-.52-2.2-1.38-2.96L17.5 7.04C17.07 6.64 16.5 6.42 15.93 6.42h-3.46M19 13h-4.5c-.83 0-1.5-.67-1.5-1.5V6.42L8.5 2.1c-.26-.26-.6-.4-1-.4a1.45 1.45 0 0 0-1.04.44L2.06 6.5A2.5 2.5 0 0 0 2 8.28V20h3m14 0h-2" /><circle cx="7" cy="17" r="2" /><circle cx="17" cy="17" r="2" /></svg>
-              </div>
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white tracking-tight leading-none">Kush Motors</h1>
-              <span className="text-[10px] font-bold text-blue-400 tracking-[0.2em] uppercase">{userRole} MODE</span>
+            <img
+              src="/logo.png"
+              alt="Kush Motors"
+              className="h-10 w-auto object-contain"
+              draggable={false}
+            />
+
+            <div className="leading-tight">
+              <h1 className="text-lg font-semibold text-white">
+                Kush Motors
+              </h1>
+              <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+                {userRole} Mode
+              </span>
             </div>
           </div>
+
           <div className="h-px bg-gradient-to-r from-transparent via-slate-800 to-transparent mb-4" />
         </div>
 
@@ -136,7 +142,7 @@ export default function MainLayout({ userRole, session }: { userRole: UserRole, 
             <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center text-white">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /><circle cx="7" cy="17" r="2" /><path d="M9 17h6" /><circle cx="17" cy="17" r="2" /></svg>
             </div>
-            <h1 className="font-bold text-lg text-slate-900">Kush Motors</h1>
+            <h1 className="font-bold text-lg text-slate-900">Car Studio</h1>
           </div>
           <Button variant="ghost" onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2">
             <Icons.Menu />

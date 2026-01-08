@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
 import { db } from '../services/mockDb';
@@ -13,81 +12,138 @@ export default function Login({ onLoginSuccess }: { onLoginSuccess: () => void }
   const [isFirstRun, setIsFirstRun] = useState(false);
 
   useEffect(() => {
-    // Check if the system has any employees
-    db.getEmployees().then(emps => {
-        setIsFirstRun(emps.length === 0);
+    db.getEmployees().then((emps) => {
+      setIsFirstRun(emps.length === 0);
     });
   }, []);
 
   const handleAuth = async () => {
+    if (!email || !password) {
+      setError('Email and password are required');
+      return;
+    }
+
     setLoading(true);
     setError('');
+
     try {
       if (isSignUp) {
         const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        alert('Check your email for the confirmation link!');
+        alert('Check your email for the confirmation link.');
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         onLoginSuccess();
       }
     } catch (err: any) {
-      setError(err.message);
+      setError(err?.message || 'Authentication failed');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-900 to-black px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-blue-500/20">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><path d="M9 17h6"/><circle cx="17" cy="17" r="2"/></svg>
-            </div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Kush Motors</h1>
-            <p className="text-slate-400">Professional Management System</p>
+
+        {/* Logo & Branding */}
+        <div className="text-center ">
+          <div className="flex justify-center ">
+            <img
+              src="/logo.png"
+              alt="Kush Motors"
+              className="h-40 w-auto drop-shadow-xl"
+              draggable={false}
+            />
+          </div>
+
         </div>
-        
-        <Card className="border-slate-800 bg-slate-800/50 backdrop-blur relative">
-           {isFirstRun && (
-             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[10px] font-black px-4 py-1 rounded-full uppercase tracking-widest shadow-lg">
-                Setup Mode Active
-             </div>
-           )}
 
-           <h2 className="text-xl font-bold text-white mb-2 text-center">{isSignUp ? 'Create Account' : 'Staff Login'}</h2>
-           <p className="text-center text-[10px] text-slate-500 uppercase tracking-widest mb-6 font-bold">
-             {isFirstRun ? 'The first user to sign up will be the Admin' : 'Enter your credentials to continue'}
-           </p>
-           
-           {error && (
-             <div className="mb-4 p-3 bg-red-500/10 border border-red-500/50 rounded-lg text-red-200 text-sm text-center">
-               {error}
-             </div>
-           )}
+        <Card className="relative border border-slate-800 bg-slate-800/60 backdrop-blur-xl shadow-xl rounded-2xl px-6">
 
-           <div className="space-y-4">
-               <Input label="Email Address" type="email" value={email} onChange={(e: any) => setEmail(e.target.value)} placeholder="your@email.com" />
-               <Input label="Password" type="password" value={password} onChange={(e: any) => setPassword(e.target.value)} placeholder="••••••••" />
-               
-               <Button onClick={handleAuth} disabled={loading} className="w-full py-3 text-lg">
-                 {loading ? 'Processing...' : (isSignUp ? 'Sign Up' : 'Login')}
-               </Button>
-           </div>
-           
-           <div className="mt-6 text-center">
-             <button onClick={() => setIsSignUp(!isSignUp)} className="text-slate-400 hover:text-white text-sm transition-colors">
-               {isSignUp ? 'Already have an account? Login' : 'Need an account? Sign Up'}
-             </button>
-           </div>
+          {/* Setup badge */}
+          {isFirstRun && (
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[10px] font-bold px-4 py-1 rounded-full tracking-widest shadow-lg">
+              SETUP MODE
+            </div>
+          )}
+
+          <h2 className="text-xl font-bold text-white text-center mb-1">
+            {isSignUp ? 'Create Admin Account' : 'Staff Login'}
+          </h2>
+
+          <p className="text-center text-xs text-slate-400 mb-6">
+            {isFirstRun
+              ? 'First registered user becomes system admin'
+              : 'Login to access your dashboard'}
+          </p>
+
+          {/* Error */}
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm text-red-300 text-center">
+              {error}
+            </div>
+          )}
+
+          {/* Form */}
+          <div className="space-y-4">
+            <Input
+              label="Email Address"
+              type="email"
+              value={email}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setEmail(e.target.value)
+              }
+              placeholder="you@company.com"
+              autoComplete="email"
+            />
+
+            <Input
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                setPassword(e.target.value)
+              }
+              placeholder="••••••••"
+              autoComplete={isSignUp ? 'new-password' : 'current-password'}
+            />
+
+            <Button
+              onClick={handleAuth}
+              disabled={loading}
+              className="w-full py-3 text-base font-semibold"
+            >
+              {loading
+                ? 'Please wait...'
+                : isSignUp
+                ? 'Create Account'
+                : 'Login'}
+            </Button>
+          </div>
+
+          {/* Toggle */}
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-sm text-slate-400 hover:text-white transition-colors"
+            >
+              {isSignUp
+                ? 'Already have an account? Login'
+                : 'Need an account? Sign up'}
+            </button>
+          </div>
         </Card>
 
+        {/* Setup hint */}
         {isFirstRun && (
-            <div className="mt-6 text-center animate-pulse">
-                <p className="text-xs text-blue-400 font-medium">System Initialization: Registration is currently open.</p>
-            </div>
+          <div className="mt-6 text-center">
+            <p className="text-xs text-blue-400">
+              System initialization in progress — registration is open
+            </p>
+          </div>
         )}
       </div>
     </div>

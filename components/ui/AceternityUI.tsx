@@ -1,16 +1,26 @@
 import React from 'react';
 
-export const Card: React.FC<{ children: React.ReactNode; className?: string; noPadding?: boolean }> = ({ children, className = '', noPadding = false }) => (
-  <div className={`relative group bg-white border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(59,130,246,0.1)] rounded-2xl transition-all duration-300 overflow-hidden ${className}`}>
-    {/* Top Gradient Line */}
-    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 opacity-80" />
-    
-    {/* Subtle Background Mesh */}
-    <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 via-white to-blue-50/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-    
-    <div className={`relative z-10 ${noPadding ? '' : 'p-6'}`}>{children}</div>
-  </div>
-);
+export const Card: React.FC<{
+  children: React.ReactNode;
+  className?: string;
+  noPadding?: boolean;
+}> = ({ children, className = '', noPadding = false }) => {
+  return (
+    <div
+      className={`
+        bg-white
+        border border-slate-200
+        rounded-xl
+        shadow-sm
+        ${noPadding ? '' : 'p-6'}
+        ${className}
+      `}
+    >
+      {children}
+    </div>
+  );
+};
+
 
 export const Button: React.FC<any> = ({ onClick, children, variant = 'primary', className = '', type = 'button', disabled = false }) => {
   const baseStyle = "px-4 py-2 rounded-lg font-medium transition-all duration-200 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:pointer-events-none shadow-sm";
