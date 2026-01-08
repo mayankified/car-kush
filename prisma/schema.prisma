@@ -1,0 +1,121 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+model Employee {
+  id             String     @id @default(uuid())
+  name           String
+  role           UserRole   @default(STAFF)
+  phone          String?
+  email          String     @unique
+  commissionRate Float      @default(0) @map("commission_rate")
+  customers      Customer[]
+  jobs           Job[]
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  @@map("employees")
+}
+
+model Setting {
+  id              String   @id @default("global")
+  referralRateL1  Float    @default(20) @map("rate_l1")
+  referralRateL2  Float    @default(10) @map("rate_l2")
+  referralRateL3  Float    @default(5) @map("rate_l3")
+  gstRate         Float    @default(18) @map("gst_rate")
+  defaultDiscount Float    @default(10) @map("default_discount")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
+
+model Customer {
+  id                   String     @id @default(uuid())
+  name                 String
+  mobile               String
+  email                String?
+  notes                String?
+  referredByCustomerId String?    @map("referred_by_customer_id")
+  referringEmployeeId  String?    @map("referring_employee_id")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  createdBy            String?    @map("created_by")
+  
+  referredBy           Customer?  @relation("CustomerToCustomer", fields: [referredByCustomerId], references: [id])
+  referrals            Customer[] @relation("CustomerToCustomer")
+  referringEmployee    Employee?  @relation(fields: [referringEmployeeId], references: [id])
+  vehicles             Vehicle[]
+  jobs                 Job[]
+
+  @@map("customers")
+}
+
+model Vehicle {
+  id              String    @id @default(uuid())
+  customerId      String    @map("customer_id")
+  regNumber       String    @unique @map("reg_number")
+  model           String?
+  color           String?
+  fuelType        String?   @map("fuel_type")
+  lastServiceDate DateTime? @map("last_service_date")
+  nextServiceDue  DateTime? @map("next_service_due")
+  createdBy       String?   @map("created_by")
+
+  customer        Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  jobs            Job[]
+
+  @@map("vehicles")
+}
+
+model Job {
+  id                       String    @id @default(uuid())
+  customerId               String    @map("customer_id")
+  vehicleId                String    @map("vehicle_id")
+  assignedEmployeeId       String?   @map("assigned_employee_id")
+  status                   String    @default("PENDING")
+  paymentMode              String?   @map("payment_mode")
+  discount                 Float     @default(0)
+  isGstEnabled             Boolean   @default(false) @map("is_gst_enabled")
+  gstRateSnap              Float     @default(18) @map("gst_rate_snap")
+  totalAmount              Float     @default(0) @map("total_amount")
+  customServiceCharge      Float     @default(0) @map("custom_service_charge")
+  customServiceDescription String?   @map("custom_service_description")
+  notes                    String?
+  images                   String[]
+  referralCommissions      Json?     @default("[]") @map("referral_commissions")
+  createdAt                DateTime  @default(now()) @map("created_at")
+  startedAt                DateTime? @map("started_at")
+  completedAt              DateTime? @map("completed_at")
+  createdBy                String?   @map("created_by")
+
+  customer                 Customer  @relation(fields: [customerId], references: [id])
+  vehicle                  Vehicle   @relation(fields: [vehicleId], references: [id])
+  employee                 Employee? @relation(fields: [assignedEmployeeId], references: [id])
+  items                    JobItem[]
+
+  @@map("jobs")
+}
+
+model JobItem {
+  id           Int    @id @default(autoincrement())
+  jobId        String @map("job_id")
+  serviceName  String @map("service_name")
+  priceAtTime  Float  @map("price_at_time")
+  job          Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("job_items")
+}
