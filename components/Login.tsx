@@ -124,7 +124,7 @@ export default function Login({ onLoginSuccess }: { onLoginSuccess: () => void }
           </div>
 
           {/* Toggle */}
-          <div className="mt-6 text-center">
+          {/* <div className="mt-6 text-center">
             <button
               type="button"
               onClick={() => setIsSignUp(!isSignUp)}
@@ -134,7 +134,7 @@ export default function Login({ onLoginSuccess }: { onLoginSuccess: () => void }
                 ? 'Already have an account? Login'
                 : 'Need an account? Sign up'}
             </button>
-          </div>
+          </div> */}
         </Card>
 
         {/* Setup hint */}
