@@ -80,7 +80,7 @@ export default function Billing() {
         <body>
           <div class="header">
              <div>
-               <div class="logo-text">CAR STUDIO</div>
+               <div class="logo-text">Kush Motors</div>
                <div class="address">
                  Shop No. 42, Auto Market, Sector 16<br/>
                  Noida, Uttar Pradesh - 201301<br/>
@@ -155,7 +155,7 @@ export default function Billing() {
           </div>
 
           <div class="footer">
-             Thank you for choosing Car Studio!<br/>
+             Thank you for choosing Kush Motors!<br/>
              For support, contact us at +91 98765 43210
           </div>
 
@@ -171,7 +171,7 @@ export default function Billing() {
       const cust = customers.find(c => c.id === job.customerId);
       if (!cust) return;
       
-      const msg = `Hi ${cust.name}, here is your Invoice #${job.id.slice(0,6)} from Car Studio for ₹${job.totalAmount}. Thank you for your business!`;
+      const msg = `Hi ${cust.name}, here is your Invoice #${job.id.slice(0,6)} from Kush Motors for ₹${job.totalAmount}. Thank you for your business!`;
       window.open(`https://wa.me/91${cust.mobile}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 

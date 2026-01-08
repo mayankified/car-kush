@@ -1,4 +1,4 @@
-# Car Studio Pro Management System
+# Kush Motors Pro Management System
 
 A high-end, professional management system designed for automotive studios, detailing centers, and workshops. Built with **React 19**, **Tailwind CSS**, and **Supabase**.
 
