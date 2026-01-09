@@ -19,45 +19,68 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const resolveRole = async (email: string) => {
     try {
       const employees = await db.getEmployees();
+
       if (employees.length === 0) {
         // Genesis Admin
         const newAdmin = {
           id: crypto.randomUUID(),
           name: email.split('@')[0],
-          email: email,
+          email,
           role: UserRole.ADMIN,
           commissionRate: 15,
-          phone: '0000000000'
+          phone: '0000000000',
         };
+
         await db.addEmployee(newAdmin);
         setUserRole(UserRole.ADMIN);
-      } else {
-        const emp = employees.find(e => e.email === email);
-        setUserRole(emp ? (emp.role as UserRole) : UserRole.STAFF);
+        return;
       }
+
+      const emp = employees.find(e => e.email === email);
+      setUserRole(emp ? (emp.role as UserRole) : UserRole.STAFF);
     } catch (err) {
-      console.error("Role resolution error:", err);
+      console.error('Role resolution error:', err);
+      setUserRole(UserRole.STAFF);
     }
   };
 
   useEffect(() => {
-    // Initial Check
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session?.user?.email) await resolveRole(session.user.email);
-      setIsLoading(false);
-    });
+    let mounted = true;
 
-    // Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
-      setSession(currentSession);
-      if (currentSession?.user?.email) {
-        await resolveRole(currentSession.user.email);
+    const initAuth = async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!mounted) return;
+
+      setSession(data.session);
+
+      // 🔥 DO NOT await this
+      if (data.session?.user?.email) {
+        resolveRole(data.session.user.email);
       }
-      setIsLoading(false);
-    });
 
-    return () => subscription.unsubscribe();
+      setIsLoading(false);
+    };
+
+    initAuth();
+
+    const { data: { subscription } } =
+      supabase.auth.onAuthStateChange((_event, currentSession) => {
+        if (!mounted) return;
+
+        setSession(currentSession);
+
+        // 🔥 DO NOT await this
+        if (currentSession?.user?.email) {
+          resolveRole(currentSession.user.email);
+        }
+
+        setIsLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (
@@ -69,6 +92,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) {
+    throw new Error('useAuth must be used within AuthProvider');
+  }
   return context;
 };
