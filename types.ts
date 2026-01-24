@@ -57,6 +57,8 @@ export interface Employee {
   phone: string;
   email?: string;
   commissionRate: number; 
+  referredByEmployeeId?: string | null; // The ID of the staff who recruited them
+  recruiterCommission?: number;
 }
 
 export interface JobService {

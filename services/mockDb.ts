@@ -50,14 +50,14 @@ class DatabaseService {
       createdAt: d.created_at, createdBy: d.created_by
     }));
   }
-async addCustomer(customer: Customer, userId: string): Promise<void> {
+  async addCustomer(customer: Customer, userId: string): Promise<void> {
     await supabase.from('customers').insert({
-      id: customer.id, 
-      name: customer.name, 
-      mobile: customer.mobile, 
-      email: customer.email, 
-      notes: customer.notes, 
-      created_at: customer.createdAt, 
+      id: customer.id,
+      name: customer.name,
+      mobile: customer.mobile,
+      email: customer.email,
+      notes: customer.notes,
+      created_at: customer.createdAt,
       created_by: userId,
       // FIXED: Used camelCase to match your Customer type
       referred_by_customer_id: customer.referredByCustomerId || null,
@@ -70,15 +70,15 @@ async addCustomer(customer: Customer, userId: string): Promise<void> {
     if (updates.name) payload.name = updates.name;
     if (updates.mobile) payload.mobile = updates.mobile;
     if (updates.email) payload.email = updates.email;
-    
+
     // FIXED: Mapping frontend camelCase to database snake_case
     if (updates.referredByCustomerId !== undefined) {
-        payload.referred_by_customer_id = updates.referredByCustomerId || null;
+      payload.referred_by_customer_id = updates.referredByCustomerId || null;
     }
     if (updates.referringEmployeeId !== undefined) {
-        payload.referring_employee_id = updates.referringEmployeeId || null;
+      payload.referring_employee_id = updates.referringEmployeeId || null;
     }
-    
+
     await supabase.from('customers').update(payload).eq('id', id);
   }
   async getJobs(): Promise<Job[]> {
@@ -115,54 +115,100 @@ async addCustomer(customer: Customer, userId: string): Promise<void> {
     }
   }
 
-  async updateJob(id: string, updates: Partial<Job>): Promise<void> {
-    // If job is being completed, calculate referral payout snapshot
-    if (updates.status === JobStatus.COMPLETED) {
-      const { data: jobData } = await supabase.from('jobs').select('*').eq('id', id).single();
-      if (jobData) {
-        const customers = await this.getCustomers();
-        const settings = await this.getSettings();
-        const referralCommissions: ReferralCommission[] = [];
-        const rates = [settings.referralRateL1 / 100, settings.referralRateL2 / 100, settings.referralRateL3 / 100];
-        const currentCustomer = customers.find(c => c.id === jobData.customer_id);
+async updateJob(id: string, updates: Partial<Job>): Promise<void> {
+  // 1. If job is being completed, calculate the full commission snapshot
+  if (updates.status === JobStatus.COMPLETED) {
+    // Fetch fresh job data including job items for precise labor calculation
+    const { data: jobData, error: jobErr } = await supabase
+      .from('jobs')
+      .select('*, job_items(*)')
+      .eq('id', id)
+      .single();
 
-        let nextParent: { custId?: string, empId?: string } | null = null;
-        if (currentCustomer?.referredByCustomerId) nextParent = { custId: currentCustomer.referredByCustomerId };
-        else if (currentCustomer?.referringEmployeeId) nextParent = { empId: currentCustomer.referringEmployeeId };
+    if (jobData && !jobErr) {
+      const customers = await this.getCustomers();
+      const employees = await this.getEmployees();
+      const settings = await this.getSettings();
+      
+      let referralCommissions: any[] = [];
 
-        for (let i = 0; i < 3; i++) {
-          if (!nextParent) break;
-          if (nextParent.custId) {
-            const parent = customers.find(c => c.id === nextParent!.custId);
-            if (!parent) break;
-            referralCommissions.push({ level: (i + 1) as 1 | 2 | 3, customerId: parent.id, amount: Math.round(jobData.total_amount * rates[i]) });
-            if (parent.referredByCustomerId) nextParent = { custId: parent.referredByCustomerId };
-            else if (parent.referringEmployeeId) nextParent = { empId: parent.referringEmployeeId };
-            else nextParent = null;
-          } else if (nextParent.empId) {
-            referralCommissions.push({ level: (i + 1) as 1 | 2 | 3, employeeId: nextParent.empId, amount: Math.round(jobData.total_amount * rates[i]) });
-            nextParent = null; // Staff are terminal nodes
+      // --- PART A: CUSTOMER REFERRAL LOGIC (Multi-level) ---
+      const rates = [settings.referralRateL1 / 100, settings.referralRateL2 / 100, settings.referralRateL3 / 100];
+      const currentCustomer = customers.find(c => c.id === jobData.customer_id);
+
+      let nextParent: { custId?: string, empId?: string } | null = null;
+      if (currentCustomer?.referredByCustomerId) nextParent = { custId: currentCustomer.referredByCustomerId };
+      else if (currentCustomer?.referringEmployeeId) nextParent = { empId: currentCustomer.referringEmployeeId };
+
+      for (let i = 0; i < 3; i++) {
+        if (!nextParent) break;
+        if (nextParent.custId) {
+          const parent = customers.find(c => c.id === nextParent!.custId);
+          if (!parent) break;
+          referralCommissions.push({ 
+            level: (i + 1), 
+            customerId: parent.id, 
+            amount: Math.round(jobData.total_amount * rates[i]),
+            type: 'CUSTOMER_REFERRAL'
+          });
+          if (parent.referredByCustomerId) nextParent = { custId: parent.referredByCustomerId };
+          else if (parent.referringEmployeeId) nextParent = { empId: parent.referringEmployeeId };
+          else nextParent = null;
+        } else if (nextParent.empId) {
+          referralCommissions.push({ 
+            level: (i + 1), 
+            employeeId: nextParent.empId, 
+            amount: Math.round(jobData.total_amount * rates[i]),
+            type: 'EMPLOYEE_CLIENT_ACQUISITION'
+          });
+          nextParent = null; 
+        }
+      }
+
+      // --- PART B: STAFF-TO-STAFF RECRUITER LOGIC (New) ---
+      // If the employee who did the job was recruited by another staff member
+      const assignedEmpId = updates.assignedEmployeeId || jobData.assigned_employee_id;
+      const performer = employees.find(e => e.id === assignedEmpId);
+
+      if (performer?.referredByEmployeeId) {
+        const recruiter = employees.find(e => e.id === performer.referredByEmployeeId);
+        if (recruiter) {
+          // Calculate commission based on total labor (job items)
+          const laborTotal = (jobData.job_items || []).reduce((sum: number, item: any) => sum + item.price_at_time, 0);
+          const recruiterShare = Math.round((laborTotal * (performer.recruiterCommission || 0)) / 100);
+          
+          if (recruiterShare > 0) {
+            referralCommissions.push({
+              level: 'RECRUITER',
+              employeeId: recruiter.id,
+              amount: recruiterShare,
+              type: 'STAFF_RECRUITMENT_REWARD',
+              sourceEmployeeName: performer.name
+            });
           }
         }
-        updates.referralCommissions = referralCommissions;
       }
+
+      updates.referralCommissions = referralCommissions;
     }
-
-    const payload: any = { ...updates };
-    const dbPayload: any = {};
-    if (payload.status) dbPayload.status = payload.status;
-    if (payload.startedAt) dbPayload.started_at = payload.startedAt;
-    if (payload.completedAt) dbPayload.completed_at = payload.completedAt;
-    if (payload.paymentMode) dbPayload.payment_mode = payload.paymentMode;
-    if (payload.totalAmount !== undefined) dbPayload.total_amount = payload.totalAmount;
-    if (payload.assignedEmployeeId !== undefined) dbPayload.assigned_employee_id = payload.assignedEmployeeId || null;
-    if (payload.referralCommissions) dbPayload.referral_commissions = payload.referralCommissions;
-    if (payload.customServiceCharge !== undefined) dbPayload.custom_service_charge = payload.customServiceCharge;
-    if (payload.customServiceDescription !== undefined) dbPayload.custom_service_description = payload.customServiceDescription;
-
-    const { error } = await supabase.from('jobs').update(dbPayload).eq('id', id);
-    if (error) this.handleError("updating job", error);
   }
+
+  // 2. Prepare Database Payload (mapping camelCase to snake_case)
+  const dbPayload: any = {};
+  if (updates.status) dbPayload.status = updates.status;
+  if (updates.startedAt) dbPayload.started_at = updates.startedAt;
+  if (updates.completedAt) dbPayload.completed_at = updates.completedAt;
+  if (updates.paymentMode) dbPayload.payment_mode = updates.paymentMode;
+  if (updates.totalAmount !== undefined) dbPayload.total_amount = updates.totalAmount;
+  if (updates.assignedEmployeeId !== undefined) dbPayload.assigned_employee_id = updates.assignedEmployeeId || null;
+  if (updates.referralCommissions) dbPayload.referral_commissions = updates.referralCommissions;
+  if (updates.customServiceCharge !== undefined) dbPayload.custom_service_charge = updates.customServiceCharge;
+  if (updates.customServiceDescription !== undefined) dbPayload.custom_service_description = updates.customServiceDescription;
+
+  // 3. Execute Update
+  const { error } = await supabase.from('jobs').update(dbPayload).eq('id', id);
+  if (error) this.handleError("updating job", error);
+}
 
   async getVehicles(): Promise<Vehicle[]> {
     const { data, error } = await supabase.from('vehicles').select('*');
@@ -191,14 +237,16 @@ async addCustomer(customer: Customer, userId: string): Promise<void> {
     if (error) return [];
     return (data || []).map((d: any) => ({
       id: d.id, name: d.name, role: d.role as UserRole,
-      phone: d.phone, email: d.email, commissionRate: d.commission_rate || 0
+      phone: d.phone, email: d.email, commissionRate: d.commission_rate || 0, referredByEmployeeId: d.referred_by_employee_id,
+      recruiterCommission: d.recruiter_commission
     }));
   }
 
   async addEmployee(emp: Employee): Promise<void> {
     await supabase.from('employees').insert({
       id: emp.id, name: emp.name, role: emp.role,
-      phone: emp.phone, email: emp.email, commission_rate: emp.commissionRate
+      phone: emp.phone, email: emp.email, commission_rate: emp.commissionRate, referred_by_employee_id: emp.referredByEmployeeId || null,
+      recruiter_commission: emp.recruiterCommission || 0
     });
   }
 

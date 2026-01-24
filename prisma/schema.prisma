@@ -25,6 +25,12 @@ model Employee {
   phone          String?
   email          String     @unique
   commissionRate Float      @default(0) @map("commission_rate")
+  referredByEmployeeId String?   @map("referred_by_employee_id")
+  recruiterCommission  Float     @default(0) @map("recruiter_commission")
+  
+  // Relations
+  recruiter          Employee?  @relation("EmployeeToEmployee", fields: [referredByEmployeeId], references: [id])
+  recruits           Employee[] @relation("EmployeeToEmployee")
   customers      Customer[]
   jobs           Job[]
   createdAt      DateTime   @default(now()) @map("created_at")
