@@ -115,100 +115,100 @@ class DatabaseService {
     }
   }
 
-async updateJob(id: string, updates: Partial<Job>): Promise<void> {
-  // 1. If job is being completed, calculate the full commission snapshot
-  if (updates.status === JobStatus.COMPLETED) {
-    // Fetch fresh job data including job items for precise labor calculation
-    const { data: jobData, error: jobErr } = await supabase
-      .from('jobs')
-      .select('*, job_items(*)')
-      .eq('id', id)
-      .single();
+  async updateJob(id: string, updates: Partial<Job>): Promise<void> {
+    // 1. If job is being completed, calculate the full commission snapshot
+    if (updates.status === JobStatus.COMPLETED) {
+      // Fetch fresh job data including job items for precise labor calculation
+      const { data: jobData, error: jobErr } = await supabase
+        .from('jobs')
+        .select('*, job_items(*)')
+        .eq('id', id)
+        .single();
 
-    if (jobData && !jobErr) {
-      const customers = await this.getCustomers();
-      const employees = await this.getEmployees();
-      const settings = await this.getSettings();
-      
-      let referralCommissions: any[] = [];
+      if (jobData && !jobErr) {
+        const customers = await this.getCustomers();
+        const employees = await this.getEmployees();
+        const settings = await this.getSettings();
 
-      // --- PART A: CUSTOMER REFERRAL LOGIC (Multi-level) ---
-      const rates = [settings.referralRateL1 / 100, settings.referralRateL2 / 100, settings.referralRateL3 / 100];
-      const currentCustomer = customers.find(c => c.id === jobData.customer_id);
+        let referralCommissions: any[] = [];
 
-      let nextParent: { custId?: string, empId?: string } | null = null;
-      if (currentCustomer?.referredByCustomerId) nextParent = { custId: currentCustomer.referredByCustomerId };
-      else if (currentCustomer?.referringEmployeeId) nextParent = { empId: currentCustomer.referringEmployeeId };
+        // --- PART A: CUSTOMER REFERRAL LOGIC (Multi-level) ---
+        const rates = [settings.referralRateL1 / 100, settings.referralRateL2 / 100, settings.referralRateL3 / 100];
+        const currentCustomer = customers.find(c => c.id === jobData.customer_id);
 
-      for (let i = 0; i < 3; i++) {
-        if (!nextParent) break;
-        if (nextParent.custId) {
-          const parent = customers.find(c => c.id === nextParent!.custId);
-          if (!parent) break;
-          referralCommissions.push({ 
-            level: (i + 1), 
-            customerId: parent.id, 
-            amount: Math.round(jobData.total_amount * rates[i]),
-            type: 'CUSTOMER_REFERRAL'
-          });
-          if (parent.referredByCustomerId) nextParent = { custId: parent.referredByCustomerId };
-          else if (parent.referringEmployeeId) nextParent = { empId: parent.referringEmployeeId };
-          else nextParent = null;
-        } else if (nextParent.empId) {
-          referralCommissions.push({ 
-            level: (i + 1), 
-            employeeId: nextParent.empId, 
-            amount: Math.round(jobData.total_amount * rates[i]),
-            type: 'EMPLOYEE_CLIENT_ACQUISITION'
-          });
-          nextParent = null; 
-        }
-      }
+        let nextParent: { custId?: string, empId?: string } | null = null;
+        if (currentCustomer?.referredByCustomerId) nextParent = { custId: currentCustomer.referredByCustomerId };
+        else if (currentCustomer?.referringEmployeeId) nextParent = { empId: currentCustomer.referringEmployeeId };
 
-      // --- PART B: STAFF-TO-STAFF RECRUITER LOGIC (New) ---
-      // If the employee who did the job was recruited by another staff member
-      const assignedEmpId = updates.assignedEmployeeId || jobData.assigned_employee_id;
-      const performer = employees.find(e => e.id === assignedEmpId);
-
-      if (performer?.referredByEmployeeId) {
-        const recruiter = employees.find(e => e.id === performer.referredByEmployeeId);
-        if (recruiter) {
-          // Calculate commission based on total labor (job items)
-          const laborTotal = (jobData.job_items || []).reduce((sum: number, item: any) => sum + item.price_at_time, 0);
-          const recruiterShare = Math.round((laborTotal * (performer.recruiterCommission || 0)) / 100);
-          
-          if (recruiterShare > 0) {
+        for (let i = 0; i < 3; i++) {
+          if (!nextParent) break;
+          if (nextParent.custId) {
+            const parent = customers.find(c => c.id === nextParent!.custId);
+            if (!parent) break;
             referralCommissions.push({
-              level: 'RECRUITER',
-              employeeId: recruiter.id,
-              amount: recruiterShare,
-              type: 'STAFF_RECRUITMENT_REWARD',
-              sourceEmployeeName: performer.name
+              level: (i + 1),
+              customerId: parent.id,
+              amount: Math.round(jobData.total_amount * rates[i]),
+              type: 'CUSTOMER_REFERRAL'
             });
+            if (parent.referredByCustomerId) nextParent = { custId: parent.referredByCustomerId };
+            else if (parent.referringEmployeeId) nextParent = { empId: parent.referringEmployeeId };
+            else nextParent = null;
+          } else if (nextParent.empId) {
+            referralCommissions.push({
+              level: (i + 1),
+              employeeId: nextParent.empId,
+              amount: Math.round(jobData.total_amount * rates[i]),
+              type: 'EMPLOYEE_CLIENT_ACQUISITION'
+            });
+            nextParent = null;
           }
         }
+
+        // --- PART B: STAFF-TO-STAFF RECRUITER LOGIC (New) ---
+        // If the employee who did the job was recruited by another staff member
+        const assignedEmpId = updates.assignedEmployeeId || jobData.assigned_employee_id;
+        const performer = employees.find(e => e.id === assignedEmpId);
+
+        if (performer?.referredByEmployeeId) {
+          const recruiter = employees.find(e => e.id === performer.referredByEmployeeId);
+          if (recruiter) {
+            // Calculate commission based on total labor (job items)
+            const laborTotal = (jobData.job_items || []).reduce((sum: number, item: any) => sum + item.price_at_time, 0);
+            const recruiterShare = Math.round((laborTotal * (performer.recruiterCommission || 0)) / 100);
+
+            if (recruiterShare > 0) {
+              referralCommissions.push({
+                level: 'RECRUITER',
+                employeeId: recruiter.id,
+                amount: recruiterShare,
+                type: 'STAFF_RECRUITMENT_REWARD',
+                sourceEmployeeName: performer.name
+              });
+            }
+          }
+        }
+
+        updates.referralCommissions = referralCommissions;
       }
-
-      updates.referralCommissions = referralCommissions;
     }
+
+    // 2. Prepare Database Payload (mapping camelCase to snake_case)
+    const dbPayload: any = {};
+    if (updates.status) dbPayload.status = updates.status;
+    if (updates.startedAt) dbPayload.started_at = updates.startedAt;
+    if (updates.completedAt) dbPayload.completed_at = updates.completedAt;
+    if (updates.paymentMode) dbPayload.payment_mode = updates.paymentMode;
+    if (updates.totalAmount !== undefined) dbPayload.total_amount = updates.totalAmount;
+    if (updates.assignedEmployeeId !== undefined) dbPayload.assigned_employee_id = updates.assignedEmployeeId || null;
+    if (updates.referralCommissions) dbPayload.referral_commissions = updates.referralCommissions;
+    if (updates.customServiceCharge !== undefined) dbPayload.custom_service_charge = updates.customServiceCharge;
+    if (updates.customServiceDescription !== undefined) dbPayload.custom_service_description = updates.customServiceDescription;
+
+    // 3. Execute Update
+    const { error } = await supabase.from('jobs').update(dbPayload).eq('id', id);
+    if (error) this.handleError("updating job", error);
   }
-
-  // 2. Prepare Database Payload (mapping camelCase to snake_case)
-  const dbPayload: any = {};
-  if (updates.status) dbPayload.status = updates.status;
-  if (updates.startedAt) dbPayload.started_at = updates.startedAt;
-  if (updates.completedAt) dbPayload.completed_at = updates.completedAt;
-  if (updates.paymentMode) dbPayload.payment_mode = updates.paymentMode;
-  if (updates.totalAmount !== undefined) dbPayload.total_amount = updates.totalAmount;
-  if (updates.assignedEmployeeId !== undefined) dbPayload.assigned_employee_id = updates.assignedEmployeeId || null;
-  if (updates.referralCommissions) dbPayload.referral_commissions = updates.referralCommissions;
-  if (updates.customServiceCharge !== undefined) dbPayload.custom_service_charge = updates.customServiceCharge;
-  if (updates.customServiceDescription !== undefined) dbPayload.custom_service_description = updates.customServiceDescription;
-
-  // 3. Execute Update
-  const { error } = await supabase.from('jobs').update(dbPayload).eq('id', id);
-  if (error) this.handleError("updating job", error);
-}
 
   async getVehicles(): Promise<Vehicle[]> {
     const { data, error } = await supabase.from('vehicles').select('*');
@@ -302,6 +302,80 @@ async updateJob(id: string, updates: Partial<Job>): Promise<void> {
 
   async deleteService(id: string): Promise<void> {
     await supabase.from('services').delete().eq('id', id);
+  }
+
+async addManualInvoice(invoice: any, userId: string): Promise<void> {
+    const { error } = await supabase.from('manual_invoices').insert({
+      id: crypto.randomUUID(), 
+      customer_name: invoice.customerName,
+      mobile: invoice.mobile,
+      vehicle_details: invoice.vehicleDetails,
+      items: invoice.items,
+      subtotal: invoice.subtotal,
+      discount: invoice.discount,
+      tax: invoice.tax,
+      total_amount: invoice.totalAmount,
+      is_gst_enabled: invoice.isGstEnabled,
+      created_at: new Date().toISOString(),
+      created_by_id: userId 
+    });
+
+    if (error) {
+      this.handleError("adding manual invoice", error);
+      throw error; // Throw so the UI can catch it and show the alert
+    }
+  }
+
+  // 2. Fetch Manual Invoices with Creator Join
+  async getManualInvoices(): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('manual_invoices')
+      .select('*, employees!created_by_id(name)')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      this.handleError('fetching manual invoices', error);
+      return [];
+    }
+
+    return (data || []).map((d: any) => ({
+      id: d.id,
+      customerName: d.customer_name,
+      mobile: d.mobile,
+      vehicleDetails: d.vehicle_details,
+      items: d.items,
+      subtotal: d.subtotal,
+      discount: d.discount,
+      tax: d.tax,
+      totalAmount: d.total_amount,
+      isGstEnabled: d.is_gst_enabled,
+      createdAt: d.created_at,
+      createdById: d.created_by_id,
+      creatorName: d.employees?.name || 'Staff'
+    }));
+  }
+
+  // 3. Update existing Manual Invoice
+  async updateManualInvoice(id: string, updates: any): Promise<void> {
+    const { error } = await supabase
+      .from('manual_invoices')
+      .update({
+        customer_name: updates.customerName,
+        mobile: updates.mobile,
+        vehicle_details: updates.vehicleDetails,
+        items: updates.items,
+        subtotal: updates.subtotal,
+        discount: updates.discount,
+        tax: updates.tax,
+        total_amount: updates.totalAmount,
+        is_gst_enabled: updates.isGstEnabled,
+      })
+      .eq('id', id);
+
+    if (error) {
+      this.handleError('updating manual invoice', error);
+      throw error;
+    }
   }
 }
 

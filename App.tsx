@@ -15,6 +15,8 @@ import Expenses from './pages/Expenses';
 import SettingsPage from './pages/Settings';
 import NetworkTree from './pages/NetworkTree';
 import Loader from './components/Loader';
+import ManualInvoice from './pages/Invoice';
+import InvoiceList from './pages/InvoiceList';
 
 function AppRoutes() {
   const { session, userRole, isLoading } = useAuth();
@@ -37,6 +39,9 @@ function AppRoutes() {
         <Route path="/customers" element={<CustomerManager />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/tree" element={<NetworkTree />} />
+        <Route path="/invoice" element={<ManualInvoice />} />
+        <Route path="/invoices" element={<InvoiceList/>} />
+
 
         {userRole === UserRole.ADMIN && (
           <>

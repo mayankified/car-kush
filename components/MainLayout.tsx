@@ -102,6 +102,7 @@ export default function MainLayout({ userRole, session }: { userRole: UserRole, 
           <NavItem to="/billing" icon={Icons.Billing} label="Invoices" />
           {isAdmin && <NavItem to="/expenses" icon={Icons.Expenses} label="Expenses" />}
           {isAdmin && <NavItem to="/reports" icon={Icons.Reports} label="Reports" />}
+          {<NavItem to="/invoice" icon={Icons.Reports} label="Manual Invoice" />}
 
           {isAdmin && (
             <>
